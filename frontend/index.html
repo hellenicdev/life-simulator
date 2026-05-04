@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Life Timeline Simulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Life Timeline Simulator</h1>
+
+<div class="controls">
+  <label>Age: <span id="ageVal">20</span></label>
+  <input type="range" id="age" min="10" max="60" value="20">
+
+  <label>Sleep: <span id="sleepVal">7</span></label>
+  <input type="range" id="sleep" min="0" max="12" value="7">
+
+  <label>Work: <span id="workVal">8</span></label>
+  <input type="range" id="work" min="0" max="16" value="8">
+
+  <label>Fun: <span id="funVal">4</span></label>
+  <input type="range" id="fun" min="0" max="10" value="4">
+
+  <button onclick="startSimulation()">Simulate Life</button>
+  <button onclick="reroll()">Alternate Timeline</button>
+</div>
+
+<div id="timeline"></div>
+
+<script src="script.js"></script>
+</body>
+</html>

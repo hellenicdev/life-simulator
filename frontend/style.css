@@ -1,0 +1,43 @@
+body {
+  font-family: Arial;
+  background: #0f0f0f;
+  color: white;
+  text-align: center;
+}
+
+.controls {
+  margin: 20px;
+}
+
+input {
+  width: 200px;
+  margin: 10px;
+}
+
+button {
+  padding: 10px;
+  margin: 10px;
+  cursor: pointer;
+}
+
+#timeline {
+  margin-top: 40px;
+  height: 500px;
+  overflow-y: scroll;
+  border-top: 2px solid #333;
+}
+
+.event {
+  margin: 40px;
+  padding: 20px;
+  background: #1a1a1a;
+  border-left: 4px solid #00ffcc;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s ease;
+}
+
+.event.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
