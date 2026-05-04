@@ -1,4 +1,4 @@
-const API_URL = "https://your-render-url.onrender.com";
+const API_URL = "https://life-simulator-qc4p.onrender.com";
 
 let lastInput = null;
 
