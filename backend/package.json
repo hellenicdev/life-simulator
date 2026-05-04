@@ -1,5 +1,5 @@
 {
-  "name": "life-simulator-backend",
+  "name": "life-simulator",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {

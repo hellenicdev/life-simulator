@@ -25,7 +25,18 @@
   <button onclick="reroll()">Alternate Timeline</button>
 </div>
 
-<div id="timeline"></div>
+<div class="timeline-wrapper">
+  <svg id="timelineLine">
+    <line x1="50%" y1="0" x2="50%" y2="3000" stroke="#00ffcc" stroke-width="4"/>
+  </svg>
+
+  <div id="timeline"></div>
+</div>
+
+<div id="summary"></div>
+<div id="stats"></div>
+
+<audio id="popSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"></audio>
 
 <script src="script.js"></script>
 </body>
