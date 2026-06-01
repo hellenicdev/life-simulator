@@ -304,6 +304,10 @@ app.post("/stats/reset", (req, res) => {
   res.json({ message: "Stats reset" });
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime(), sessions: sessions.length });
+});
+
 app.listen(PORT, () => {
   console.log("Life Simulator v2 running on port " + PORT);
 });
