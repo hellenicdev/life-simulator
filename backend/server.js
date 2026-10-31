@@ -1,14 +1,65 @@
+const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 const { v4: uuidv4 } = require("uuid");
 
+function positiveInt(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.floor(n);
+}
+
+function tokensMatch(provided, expected) {
+  const left = Buffer.from(String(provided));
+  const right = Buffer.from(String(expected));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
 const app = express();
-app.use(cors());
-app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
+const CORS_ORIGIN = (process.env.CORS_ORIGIN || "https://hellenicdev.eu").trim();
+const MAX_SESSIONS = positiveInt(process.env.MAX_SESSIONS, 1000);
+const ADMIN_TOKEN = (process.env.ADMIN_TOKEN || "").trim();
+const RATE_LIMIT_WINDOW_MS = positiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60 * 1000);
+const RATE_LIMIT_MAX = positiveInt(process.env.RATE_LIMIT_MAX, 60);
+
+// Trust the immediate proxy (Render) for the client IP.
+app.set("trust proxy", 1);
+app.use(cors({ origin: [CORS_ORIGIN] }));
+app.use(express.json());
+app.use(rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  limit: RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+  skip: (req) => req.path === "/api/health"
+}));
 
 let sessions = [];
+
+function rememberSession(session) {
+  sessions.push(session);
+  if (sessions.length > MAX_SESSIONS) {
+    sessions.splice(0, sessions.length - MAX_SESSIONS);
+  }
+}
+
+function requireAdmin(req, res, next) {
+  const headerToken = (req.get("x-admin-token") || "").trim();
+  const authorization = req.get("authorization") || "";
+  const bearer = authorization.slice(0, 7).toLowerCase() === "bearer "
+    ? authorization.slice(7).trim()
+    : "";
+  const provided = headerToken || bearer;
+  if (!ADMIN_TOKEN || !provided || !tokensMatch(provided, ADMIN_TOKEN)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  next();
+}
 
 const ICONS = {
   health: "🏥", wealth: "💰", career: "💼", relationship: "💕",
@@ -245,7 +296,7 @@ app.post("/simulate", (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    sessions.push(session);
+    rememberSession(session);
 
     res.json(session);
   } catch (err) {
@@ -299,7 +350,7 @@ app.get("/history", (req, res) => {
   res.json(sessions.slice(-limit).reverse());
 });
 
-app.post("/stats/reset", (req, res) => {
+app.post("/stats/reset", requireAdmin, (req, res) => {
   sessions = [];
   res.json({ message: "Stats reset" });
 });
@@ -308,6 +359,6 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime(), sessions: sessions.length });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log("Life Simulator v2 running on port " + PORT);
 });
