@@ -29,7 +29,7 @@ const RATE_LIMIT_MAX = positiveInt(process.env.RATE_LIMIT_MAX, 60);
 // Trust the immediate proxy (Render) for the client IP.
 app.set("trust proxy", 1);
 app.use(cors({ origin: [CORS_ORIGIN] }));
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 app.use(rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
   limit: RATE_LIMIT_MAX,
@@ -72,6 +72,14 @@ const EVENT_TYPES = ["health", "wealth", "career", "relationship", "education", 
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+// Read a numeric input, keeping 0 as a valid value (the old `Number(x) || d`
+// pattern silently replaced 0 with the default, e.g. 0 hours of exercise -> 3).
+function num(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function weightedRandom(entries) {
@@ -82,16 +90,16 @@ function weightedRandom(entries) {
 }
 
 function generateLife(input) {
-  const age = clamp(Number(input.age) || 20, 10, 100);
-  const sleep = clamp(Number(input.sleep) || 7, 0, 12);
-  const work = clamp(Number(input.work) || 8, 0, 16);
-  const fun = clamp(Number(input.fun) || 4, 0, 24);
-  const exercise = clamp(Number(input.exercise) || 3, 0, 14);
-  const social = clamp(Number(input.social) || 5, 0, 14);
-  const diet = clamp(Number(input.diet) || 6, 0, 10);
-  const education = clamp(Number(input.education) || 5, 0, 10);
-  const finance = clamp(Number(input.finance) || 5, 0, 10);
-  const risk = clamp(Number(input.risk) || 5, 0, 10);
+  const age = clamp(num(input.age, 20), 10, 100);
+  const sleep = clamp(num(input.sleep, 7), 0, 12);
+  const work = clamp(num(input.work, 8), 0, 16);
+  const fun = clamp(num(input.fun, 4), 0, 24);
+  const exercise = clamp(num(input.exercise, 3), 0, 14);
+  const social = clamp(num(input.social, 5), 0, 14);
+  const diet = clamp(num(input.diet, 6), 0, 10);
+  const education = clamp(num(input.education, 5), 0, 10);
+  const finance = clamp(num(input.finance, 5), 0, 10);
+  const risk = clamp(num(input.risk, 5), 0, 10);
 
   let timeline = [];
   let year = age;
@@ -282,9 +290,23 @@ function generateLife(input) {
   return { timeline, finalScores: scores, lifeScore };
 }
 
+const INPUT_KEYS = ["age", "sleep", "work", "fun", "exercise", "social", "diet", "education", "finance", "risk"];
+
+// Keep only known numeric fields so arbitrary client JSON is never stored
+// in memory or echoed back through /history.
+function sanitizeInput(body) {
+  const out = {};
+  if (!body || typeof body !== "object") return out;
+  for (const key of INPUT_KEYS) {
+    const n = Number(body[key]);
+    if (body[key] !== undefined && body[key] !== "" && Number.isFinite(n)) out[key] = n;
+  }
+  return out;
+}
+
 app.post("/simulate", (req, res) => {
   try {
-    const input = req.body;
+    const input = sanitizeInput(req.body);
     const result = generateLife(input);
 
     const session = {
@@ -300,18 +322,18 @@ app.post("/simulate", (req, res) => {
 
     res.json(session);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: "Invalid input" });
   }
 });
 
 app.post("/reroll", (req, res) => {
   try {
-    const { input } = req.body;
-    if (!input) return res.status(400).json({ error: "Missing input" });
-    const result = generateLife(input);
+    const raw = req.body && req.body.input;
+    if (!raw || typeof raw !== "object") return res.status(400).json({ error: "Missing input" });
+    const result = generateLife(sanitizeInput(raw));
     res.json(result);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: "Invalid input" });
   }
 });
 
@@ -357,6 +379,17 @@ app.post("/stats/reset", requireAdmin, (req, res) => {
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime(), sessions: sessions.length });
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  const bad = err && (err.type === "entity.parse.failed" || err.type === "entity.too.large");
+  if (!bad) console.error("Request error:", err && err.message);
+  res.status(bad ? 400 : 500).json({ error: bad ? "Invalid request" : "Internal server error" });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
